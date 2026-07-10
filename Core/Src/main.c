@@ -315,34 +315,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 
 
-void SensorTask(void*) {
-  
 
-  uint8_t check = 0;
-  HAL_I2C_Mem_Read(&hi2c1, SENSOR_ADDRESS, WHO_AM_I, I2C_MEMADD_SIZE_8BIT, &check, 1, 1000);
-
-  if(check != 0x68) {
-    LogMessage("Sensor was not detected!");
-    return;
-  }
-
-  // Sensor initialize
-  uint8_t pwrOnData = 0;
-  HAL_I2C_Mem_Write(&hi2c1, SENSOR_ADDRESS, PWR_MGMT, I2C_MEMADD_SIZE_8BIT, &pwrOnData, 1, 1000);
-
-  char dataMsg[100];
-  struct MPU6050Data data;
-  while(1) {
-    HAL_I2C_Mem_Read(&hi2c1, SENSOR_ADDRESS, MEM_START_ADDRESS, I2C_MEMADD_SIZE_8BIT, (uint8_t*)(&data), 14, 1000);
-    PopulateRealValues(&data);
-    ApplyMadgwickFilter(&data);
-    snprintf(dataMsg, sizeof(dataMsg), "Gyro Roll: %.4f Pitch: %.4f Yaw: %.4f Temp: %.4f\r\n", data.roll, data.pitch, data.yaw, data.temp);
-    LogMessage(dataMsg);
-    // snprintf(dataMsg, sizeof(dataMsg), "Gyro Roll: %f Pitch: %f Yaw: %f \n", data.roll, data.pitch, data.yaw);
-    // LogMessage(dataMsg);
-    vTaskDelay(pdMS_TO_TICKS(READ_DELAY));
-  }
-}
 
 /* USER CODE END 4 */
 
