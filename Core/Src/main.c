@@ -32,6 +32,7 @@
 #include "usbd_cdc_if.h"
 #include "GyroData.h"
 #include "filter.h"
+#include <stdint.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -44,8 +45,13 @@
 
 #define SENSOR_ADDRESS (0x68 << 1)
 #define WHO_AM_I 0x75
-#define MEM_START_ADDRESS 0x3B
+#define ACCEL_MEM_START_ADDRESS 0x3B
+#define GYRO_MEM_START_ADDRESS 0x43
+#define TEMP_MEM_START_ADDRESS 0x41
 #define PWR_MGMT 0x6B
+#define SMPLRT_DIV 0x19
+#define GYRO_CONFIG 0X1B
+#define ACCEL_CONFIG 0X1C
 #define READ_DELAY 5
 /* USER CODE END PD */
 
@@ -322,7 +328,8 @@ void SensorTask(void*) {
   uint8_t check = 0;
   vTaskDelay(pdMS_TO_TICKS(1));
   HAL_I2C_Mem_Read(&hi2c1, SENSOR_ADDRESS, WHO_AM_I, I2C_MEMADD_SIZE_8BIT, &check, 1, 1000);
-  
+
+ 
   
 
   if(check != 0x70) {
@@ -334,10 +341,26 @@ void SensorTask(void*) {
   uint8_t pwrOnData = 0;
   HAL_I2C_Mem_Write(&hi2c1, SENSOR_ADDRESS, PWR_MGMT, I2C_MEMADD_SIZE_8BIT, &pwrOnData, 1, 1000);
 
+  //setting sample rate div
+  uint8_t sample_rate_divider=7;
+  HAL_I2C_Mem_Write(&hi2c1, SENSOR_ADDRESS, SMPLRT_DIV, I2C_MEMADD_SIZE_8BIT, &sample_rate_divider, 1, 1000);
+  //setting dlpf
+  uint8_t dlpf_config=0;
+  HAL_I2C_Mem_Write(&hi2c1, SENSOR_ADDRESS, 0x1A, I2C_MEMADD_SIZE_8BIT, &sample_rate_divider, 1, 1000);
+uint8_t Data = 0x00; 
+HAL_I2C_Mem_Write(&hi2c1, WHO_AM_I, ACCEL_CONFIG, 1, &Data, 1, 1000);
+	HAL_I2C_Mem_Write(&hi2c1, WHO_AM_I, GYRO_CONFIG, 1, &Data, 1, 1000);
+
+
   char dataMsg[100];
   struct MPU6050Data data;
   while(1) {
-    HAL_I2C_Mem_Read(&hi2c1, SENSOR_ADDRESS, MEM_START_ADDRESS, I2C_MEMADD_SIZE_8BIT, (uint8_t*)(&data), 14, 1000);
+    //reading accel data
+    HAL_I2C_Mem_Read(&hi2c1, SENSOR_ADDRESS, ACCEL_MEM_START_ADDRESS, I2C_MEMADD_SIZE_8BIT, data.accel_rec_data, 6, 1000);
+    //reading gyro data
+    HAL_I2C_Mem_Read(&hi2c1, SENSOR_ADDRESS, GYRO_MEM_START_ADDRESS, I2C_MEMADD_SIZE_8BIT, data.gyro_rec_data, 6, 1000);
+    //reading temp data
+    HAL_I2C_Mem_Read(&hi2c1,WHO_AM_I,TEMP_MEM_START_ADDRESS , 1, data.Temp_Data, 2, 1000);
     PopulateRealValues(&data);
     //ApplyMadgwickFilter(&data);
     snprintf(dataMsg, sizeof(dataMsg), "Gyro Roll: %.4f Pitch: %.4f Yaw: %.4f Temp: %.4f\r\n", data.gyro_x, data.gyro_y, data.gyro_z, data.temp);

@@ -5,31 +5,35 @@
 #include "FreeRTOS.h"
 
 #define SWAP_ENDIAN(x) ((int16_t)(((uint16_t)x & 0xff00) >> 8) | ((uint16_t)x & 0xff))
-
+#define gyroDivider 131.0
+#define accelDivider 16384.0
 uint32_t lastTick;
 float deltaT;
 
 void PopulateRealValues(struct MPU6050Data *data) {
-    data->accel_x_raw = SWAP_ENDIAN(data->accel_x_raw);
-    data->accel_y_raw = SWAP_ENDIAN(data->accel_y_raw);
-    data->accel_z_raw = SWAP_ENDIAN(data->accel_z_raw);
-    data->gyro_x_raw = SWAP_ENDIAN(data->gyro_x_raw);
-    data->gyro_y_raw = SWAP_ENDIAN(data->gyro_y_raw);
-    data->gyro_z_raw = SWAP_ENDIAN(data->gyro_z_raw);
-    data->temp_raw = SWAP_ENDIAN(data->temp_raw);
+    data->accel_x_raw =(int16_t)(data->accel_rec_data[0] << 8 | data->accel_rec_data[1]);
+    data->accel_y_raw =(int16_t)(data->accel_rec_data[2] << 8 | data->accel_rec_data[1]);
+    data->accel_z_raw =(int16_t)(data->accel_rec_data[4] << 8 | data->accel_rec_data[1]);
 
-    // In degress / s
-    data->gyro_x = ((float)data->gyro_x_raw / 131.0f) * M_PI / 180.f;
-    data->gyro_y = ((float)data->gyro_y_raw / 131.0f) * M_PI / 180.f;
-    data->gyro_z = ((float)data->gyro_z_raw / 131.0f) * M_PI / 180.f;
+    data->gyro_z_raw =(int16_t)(data->gyro_rec_data[4] << 8 | data->gyro_rec_data[1]);
+    data->gyro_x_raw =(int16_t)(data->gyro_rec_data[0] << 8 | data->gyro_rec_data[1]);
+    data->gyro_y_raw =(int16_t)(data->gyro_rec_data[2] << 8 | data->gyro_rec_data[1]);
 
-    // In celsius
-    data->temp = ((float)data->temp_raw/340.0f) + 36.53f;
+    data->temp_raw = (int16_t)(data->Temp_Data[0] << 8 | data->Temp_Data[1]);
 
-    // In G forces
-    data->accel_x = (float)data->accel_x_raw / 16384.0f;
-    data->accel_y = (float)data->accel_y_raw / 16384.0f;
-    data->accel_z = (float)data->accel_z_raw / 16384.0f;
+    //actual data
+
+    data->accel_x = data->accel_x_raw/accelDivider;
+    data->accel_y = data->accel_y_raw/accelDivider;
+    data->accel_z = data->accel_z_raw/accelDivider;
+
+
+    data->gyro_x = data->gyro_x_raw/gyroDivider;
+    data->gyro_y = data->gyro_y_raw/gyroDivider;
+    data->gyro_z = data->gyro_z_raw/gyroDivider;
+
+    data->temp = ((float)data->temp_raw / 340.0) + 36.53;
+
 }
 
 void ApplyMadgwickFilter(struct MPU6050Data* data) {

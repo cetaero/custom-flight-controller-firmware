@@ -3,6 +3,9 @@
 #include <stdint.h>
 
 struct MPU6050Data {
+    uint8_t accel_rec_data[6];
+    uint8_t gyro_rec_data[6];
+    uint8_t Temp_Data[2];
     int16_t accel_x_raw;
     int16_t accel_y_raw;
     int16_t accel_z_raw;
