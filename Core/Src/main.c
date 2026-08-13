@@ -19,9 +19,6 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
-#include "cmsis_os2.h"
-#include "projdefs.h"
-#include "stm32f4xx_hal_i2c.h"
 #include "usb_device.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -33,6 +30,9 @@
 #include "GyroData.h"
 #include "filter.h"
 #include <stdint.h>
+
+#include "i2c_helper.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -42,16 +42,12 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+//ADDRESS_DEF
 #define SENSOR_ADDRESS (0x68 << 1)
-#define WHO_AM_I 0x75
-#define ACCEL_MEM_START_ADDRESS 0x3B
-#define GYRO_MEM_START_ADDRESS 0x43
-#define TEMP_MEM_START_ADDRESS 0x41
-#define PWR_MGMT 0x6B
-#define SMPLRT_DIV 0x19
-#define GYRO_CONFIG 0X1B
-#define ACCEL_CONFIG 0X1C
+#define CHIP_ID 0x00
+#define DEVICE_STATUS_REG 0x01
+#define SENSOR_STATUS_REG 0x02
+
 #define READ_DELAY 5
 /* USER CODE END PD */
 
@@ -72,6 +68,13 @@ const osThreadAttr_t defaultTask_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
+/* Definitions for SensorTask */
+osThreadId_t SensorTaskHandle;
+const osThreadAttr_t SensorTask_attributes = {
+  .name = "SensorTask",
+  .stack_size = 2048 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
 /* USER CODE BEGIN PV */
 
 osThreadId_t sensorTask;
@@ -89,13 +92,21 @@ static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_USART1_UART_Init(void);
 void StartDefaultTask(void *argument);
+void SensorTaskEntry(void *argument);
 
 /* USER CODE BEGIN PFP */
 void SensorTask(void*);
 void LogMessage(const char* msg) {
-  while(CDC_Transmit_FS((uint8_t*)msg, strlen(msg) - 1) == USBD_BUSY){}
+  uint32_t timeout = 100;  // ms
+  uint32_t start = HAL_GetTick();
+  
+  while(CDC_Transmit_FS((uint8_t*)msg, strlen(msg) - 1) == USBD_BUSY) {
+    if (HAL_GetTick() - start > timeout) {
+      return;
+    }
+    vTaskDelay(1);
+  }
 }
-
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -135,7 +146,7 @@ int main(void)
   MX_I2C1_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  
+  MX_USB_DEVICE_Init();
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -160,7 +171,10 @@ int main(void)
   /* Create the thread(s) */
   /* creation of defaultTask */
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
-  sensorTask = osThreadNew(SensorTask, NULL, &sensorTask_attrs);
+
+  /* creation of SensorTask */
+  SensorTaskHandle = osThreadNew(SensorTaskEntry, NULL, &SensorTask_attributes);
+
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -319,57 +333,18 @@ static void MX_GPIO_Init(void)
 
   /* USER CODE END MX_GPIO_Init_2 */
 }
+
 /* USER CODE BEGIN 4 */
 
 
-void SensorTask(void*) {
+// void SensorTask(void*) {
   
 
-  uint8_t check = 0;
-  vTaskDelay(pdMS_TO_TICKS(1));
-  HAL_I2C_Mem_Read(&hi2c1, SENSOR_ADDRESS, WHO_AM_I, I2C_MEMADD_SIZE_8BIT, &check, 1, 1000);
-
- 
-  
-
-  if(check != 0x70) {
-    LogMessage("Sensor was not detected!");
-    //return;
-  }
-
-  // Sensor initialize
-  uint8_t pwrOnData = 0;
-  HAL_I2C_Mem_Write(&hi2c1, SENSOR_ADDRESS, PWR_MGMT, I2C_MEMADD_SIZE_8BIT, &pwrOnData, 1, 1000);
-
-  //setting sample rate div
-  uint8_t sample_rate_divider=7;
-  HAL_I2C_Mem_Write(&hi2c1, SENSOR_ADDRESS, SMPLRT_DIV, I2C_MEMADD_SIZE_8BIT, &sample_rate_divider, 1, 1000);
-  //setting dlpf
-  uint8_t dlpf_config=0;
-  HAL_I2C_Mem_Write(&hi2c1, SENSOR_ADDRESS, 0x1A, I2C_MEMADD_SIZE_8BIT, &sample_rate_divider, 1, 1000);
-uint8_t Data = 0x00; 
-HAL_I2C_Mem_Write(&hi2c1, WHO_AM_I, ACCEL_CONFIG, 1, &Data, 1, 1000);
-	HAL_I2C_Mem_Write(&hi2c1, WHO_AM_I, GYRO_CONFIG, 1, &Data, 1, 1000);
-
-
-  char dataMsg[100];
-  struct MPU6050Data data;
-  while(1) {
-    //reading accel data
-    HAL_I2C_Mem_Read(&hi2c1, SENSOR_ADDRESS, ACCEL_MEM_START_ADDRESS, I2C_MEMADD_SIZE_8BIT, data.accel_rec_data, 6, 1000);
-    //reading gyro data
-    HAL_I2C_Mem_Read(&hi2c1, SENSOR_ADDRESS, GYRO_MEM_START_ADDRESS, I2C_MEMADD_SIZE_8BIT, data.gyro_rec_data, 6, 1000);
-    //reading temp data
-    HAL_I2C_Mem_Read(&hi2c1,WHO_AM_I,TEMP_MEM_START_ADDRESS , 1, data.Temp_Data, 2, 1000);
-    PopulateRealValues(&data);
-    //ApplyMadgwickFilter(&data);
-    snprintf(dataMsg, sizeof(dataMsg), "Gyro Roll: %.4f Pitch: %.4f Yaw: %.4f Temp: %.4f\r\n", data.gyro_x, data.gyro_y, data.gyro_z, data.temp);
-    LogMessage(dataMsg);
-    // snprintf(dataMsg, sizeof(dataMsg), "Gyro Roll: %f Pitch: %f Yaw: %f \n", data.roll, data.pitch, data.yaw);
-    // LogMessage(dataMsg);
-    vTaskDelay(pdMS_TO_TICKS(READ_DELAY));
-  }
-}
+//   while(1) {
+    
+//     vTaskDelay(pdMS_TO_TICKS(READ_DELAY));
+//   }
+// }
 
 /* USER CODE END 4 */
 
@@ -391,6 +366,110 @@ void StartDefaultTask(void *argument)
     osDelay(1);
   }
   /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_SensorTaskEntry */
+/**
+* @brief Function implementing the SensorTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_SensorTaskEntry */
+void SensorTaskEntry(void *argument)
+{
+  /* USER CODE BEGIN SensorTaskEntry */
+uint8_t chip_id = 0;
+uint8_t buf[3] = {0,0,0};
+//checking communication
+HAL_I2C_Mem_Read(&hi2c1,
+                 SENSOR_ADDRESS,
+                 CHIP_ID,
+                 I2C_MEMADD_SIZE_8BIT,
+                 buf,
+                 sizeof(buf),
+                 1000);
+
+chip_id = buf[2];
+buf[2]=0xff;
+if (chip_id != 0x43) {
+    LogMessage("Sensor Communication Error!");
+}
+
+  // Sensor initialize
+  uint8_t device_status = 99;
+  uint8_t sensor_status =0;
+  
+  HAL_I2C_Mem_Read(&hi2c1,
+                 SENSOR_ADDRESS,
+                 DEVICE_STATUS_REG,
+                 I2C_MEMADD_SIZE_8BIT,
+                 buf,
+                 sizeof(buf),
+                 1000);
+  device_status=buf[2];
+  buf[2]=0xff;
+  if(device_status==0b0){
+    //power ok
+    LogMessage("Power OK");
+
+    //cehcking sensor status
+    HAL_I2C_Mem_Read(&hi2c1,
+                 SENSOR_ADDRESS,
+                 SENSOR_STATUS_REG,
+                 I2C_MEMADD_SIZE_8BIT,
+                 buf,
+                 sizeof(buf),
+                 1000);
+    sensor_status=buf[2];
+    buf[2]=0xff;
+    if(sensor_status==0b1){
+      LogMessage("initialisation OK");
+    }else{
+      LogMessage("initialisation ERR");
+    }
+  }else{
+    LogMessage("Power ERR");
+  }
+
+  //normal power mode
+  // Write to register 0x20
+uint8_t data1[] = {0xa7, 0x40};
+HAL_I2C_Mem_Write(&hi2c1,
+                  SENSOR_ADDRESS,      
+                  0x20,           // Register address
+                  I2C_MEMADD_SIZE_8BIT,
+                  data1,
+                  sizeof(data1),  // 2 bytes
+                  1000);
+
+// Write to register 0x21
+uint8_t data2[] = {0x4B, 0x40};
+HAL_I2C_Mem_Write(&hi2c1,
+                  SENSOR_ADDRESS,
+                  0x21,
+                  I2C_MEMADD_SIZE_8BIT,
+                  data2,
+                  sizeof(data2),  // 2 bytes
+                  1000);
+
+  char dataMsg[100];
+  struct MPU6050Data data;
+  //HAL_StatusTypeDef dataReadStatus;
+  /* Infinite loop */
+  for(;;)
+  {
+    //reading accel data
+    read_register_burst_16(SENSOR_ADDRESS, 0x03, 6, data.accel_gyro_sample_16,2);
+    PopulateRealValues(&data);
+    //ApplyMadgwickFilter(&data);
+    //print(f"{ax},{ay},{az},{gx},{gy},{gz}")
+    snprintf(dataMsg, sizeof(dataMsg), "%d,%d,%d,%d,%d,%d\r\n",data.accel_x_raw,data.accel_y_raw,data.accel_z_raw,data.gyro_x_raw, data.gyro_y_raw, data.gyro_z_raw);
+    LogMessage(dataMsg);
+    // snprintf(dataMsg, sizeof(dataMsg), "Gyro Roll: %f Pitch: %f Yaw: %f \n", data.roll, data.pitch, data.yaw);
+    // LogMessage(dataMsg);
+    osDelay(100);
+  }
+  /* USER CODE END SensorTaskEntry */
 }
 
 /**
