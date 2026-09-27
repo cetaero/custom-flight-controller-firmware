@@ -415,18 +415,27 @@ void StartDefaultTask(void *argument)
 void SensorTaskEntry(void *argument)
 {
   /* USER CODE BEGIN SensorTaskEntry */
-uint8_t chip_id = 0;
-uint8_t buf[3] = {0,0,0};
+uint8_t chip_id = 13;
+uint8_t buf[3] = {0,0,14};
 //checking communication
-HAL_I2C_Mem_Read(&hi2c1,
-                 SENSOR_ADDRESS,
-                 CHIP_ID,
-                 I2C_MEMADD_SIZE_8BIT,
-                 buf,
-                 sizeof(buf),
-                 1000);
+HAL_StatusTypeDef ret = HAL_I2C_Mem_Read(&hi2c2, SENSOR_ADDRESS, CHIP_ID, I2C_MEMADD_SIZE_8BIT, buf, sizeof(buf), 1000);
 
+if (ret == HAL_ERROR) {
+    uint32_t err = HAL_I2C_GetError(&hi2c2);
+ 
+    // err == HAL_I2C_ERROR_AF   (0x04) -> Address/Wiring/NACK issue
+    // err == HAL_I2C_ERROR_BERR (0x01) -> Bus error / missing pull-ups
+    // err == HAL_I2C_ERROR_ARLO (0x02) -> Arbitration lost
+}
+uint8_t found_addr = 0;
+for (uint8_t i = 1; i < 128; i++) {
+    if (HAL_I2C_IsDeviceReady(&hi2c2, (i << 1), 1, 10) == HAL_OK) {
+        found_addr = i;
+        break; // Found device!
+    }
+}
 chip_id = buf[2];
+
 buf[2]=255;
 if (chip_id != 0x43) {
     LogMessage("Sensor Communication Error!");
@@ -500,7 +509,7 @@ HAL_I2C_Mem_Write(&hi2c2,
     PopulateRealValues(&data);
     //ApplyMadgwickFilter(&data);
     //print(f"{ax},{ay},{az},{gx},{gy},{gz}")
-    snprintf(dataMsg, sizeof(dataMsg), "%d,%d,%d,%d,%d,%d\r\n",data.accel_x_raw,data.accel_y_raw,data.accel_z_raw,data.gyro_x_raw, data.gyro_y_raw, data.gyro_z_raw);
+    snprintf(dataMsg, sizeof(dataMsg), "%d,%d,%d,%d,%d,%d                  \r\n",data.accel_x_raw,data.accel_y_raw,data.accel_z_raw,data.gyro_x_raw, data.gyro_y_raw, data.gyro_z_raw);
     LogMessage(dataMsg);
     // snprintf(dataMsg, sizeof(dataMsg), "Gyro Roll: %f Pitch: %f Yaw: %f \n", data.roll, data.pitch, data.yaw);
     // LogMessage(dataMsg);
