@@ -1,12 +1,13 @@
 #include "i2c_helper.h"
 
-extern I2C_HandleTypeDef hi2c1;  // From main.c
+extern I2C_HandleTypeDef hi2c2;  // From main.c
 
+extern I2C_HandleTypeDef hi2c1; 
 
 HAL_StatusTypeDef read_register_burst_16(uint8_t addr, uint8_t reg, uint8_t words, int16_t *result, uint8_t padding) {
     uint8_t buffer[words * 2 + padding];
     
-    if (HAL_I2C_Mem_Read(&hi2c1, addr, reg, I2C_MEMADD_SIZE_8BIT, 
+    if (HAL_I2C_Mem_Read(&hi2c2, addr, reg, I2C_MEMADD_SIZE_8BIT, 
                          buffer, words * 2 + padding, 1000) != HAL_OK) {
         return HAL_ERROR;
     }

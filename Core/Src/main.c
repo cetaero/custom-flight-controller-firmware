@@ -58,6 +58,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
+I2C_HandleTypeDef hi2c2;
 
 UART_HandleTypeDef huart1;
 
@@ -91,6 +92,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_I2C2_Init(void);
 void StartDefaultTask(void *argument);
 void SensorTaskEntry(void *argument);
 
@@ -145,6 +147,7 @@ int main(void)
   MX_GPIO_Init();
   MX_I2C1_Init();
   MX_USART1_UART_Init();
+  MX_I2C2_Init();
   /* USER CODE BEGIN 2 */
   MX_USB_DEVICE_Init();
   /* USER CODE END 2 */
@@ -281,6 +284,40 @@ static void MX_I2C1_Init(void)
 }
 
 /**
+  * @brief I2C2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C2_Init(void)
+{
+
+  /* USER CODE BEGIN I2C2_Init 0 */
+
+  /* USER CODE END I2C2_Init 0 */
+
+  /* USER CODE BEGIN I2C2_Init 1 */
+
+  /* USER CODE END I2C2_Init 1 */
+  hi2c2.Instance = I2C2;
+  hi2c2.Init.ClockSpeed = 100000;
+  hi2c2.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c2.Init.OwnAddress1 = 0;
+  hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c2.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c2.Init.OwnAddress2 = 0;
+  hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C2_Init 2 */
+
+  /* USER CODE END I2C2_Init 2 */
+
+}
+
+/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -326,8 +363,8 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOH_CLK_ENABLE();
-  __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
@@ -390,7 +427,7 @@ HAL_I2C_Mem_Read(&hi2c1,
                  1000);
 
 chip_id = buf[2];
-buf[2]=0xff;
+buf[2]=255;
 if (chip_id != 0x43) {
     LogMessage("Sensor Communication Error!");
 }
@@ -399,7 +436,7 @@ if (chip_id != 0x43) {
   uint8_t device_status = 99;
   uint8_t sensor_status =0;
   
-  HAL_I2C_Mem_Read(&hi2c1,
+  HAL_I2C_Mem_Read(&hi2c2,
                  SENSOR_ADDRESS,
                  DEVICE_STATUS_REG,
                  I2C_MEMADD_SIZE_8BIT,
@@ -413,7 +450,7 @@ if (chip_id != 0x43) {
     LogMessage("Power OK");
 
     //cehcking sensor status
-    HAL_I2C_Mem_Read(&hi2c1,
+    HAL_I2C_Mem_Read(&hi2c2,
                  SENSOR_ADDRESS,
                  SENSOR_STATUS_REG,
                  I2C_MEMADD_SIZE_8BIT,
@@ -434,7 +471,7 @@ if (chip_id != 0x43) {
   //normal power mode
   // Write to register 0x20
 uint8_t data1[] = {0xa7, 0x40};
-HAL_I2C_Mem_Write(&hi2c1,
+HAL_I2C_Mem_Write(&hi2c2,
                   SENSOR_ADDRESS,      
                   0x20,           // Register address
                   I2C_MEMADD_SIZE_8BIT,
@@ -444,7 +481,7 @@ HAL_I2C_Mem_Write(&hi2c1,
 
 // Write to register 0x21
 uint8_t data2[] = {0x4B, 0x40};
-HAL_I2C_Mem_Write(&hi2c1,
+HAL_I2C_Mem_Write(&hi2c2,
                   SENSOR_ADDRESS,
                   0x21,
                   I2C_MEMADD_SIZE_8BIT,
