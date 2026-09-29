@@ -47,6 +47,8 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
     Core/Src/helpers/i2c_helper.c
     Core/Src/helpers/filter.c
+    Core/Src/helpers/MadgwickAHRS.c
+
 )
 
 # Add include paths

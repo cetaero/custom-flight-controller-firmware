@@ -509,10 +509,10 @@ HAL_I2C_Mem_Write(&hi2c2,
     PopulateRealValues(&data);
     //ApplyMadgwickFilter(&data);
     //print(f"{ax},{ay},{az},{gx},{gy},{gz}")
-    snprintf(dataMsg, sizeof(dataMsg), "%d,%d,%d,%d,%d,%d                  \r\n",data.accel_x_raw,data.accel_y_raw,data.accel_z_raw,data.gyro_x_raw, data.gyro_y_raw, data.gyro_z_raw);
+    //snprintf(dataMsg, sizeof(dataMsg), "%d,%d,%d,%d,%d,%d                  \r\n",data.accel_x_raw,data.accel_y_raw,data.accel_z_raw,data.gyro_x_raw, data.gyro_y_raw, data.gyro_z_raw);
+    snprintf(dataMsg, sizeof(dataMsg), "%f,%f,%f            \r\n",data.pitch,data.roll,data.yaw);
     LogMessage(dataMsg);
-    // snprintf(dataMsg, sizeof(dataMsg), "Gyro Roll: %f Pitch: %f Yaw: %f \n", data.roll, data.pitch, data.yaw);
-    // LogMessage(dataMsg);
+    
     osDelay(100);
   }
   /* USER CODE END SensorTaskEntry */

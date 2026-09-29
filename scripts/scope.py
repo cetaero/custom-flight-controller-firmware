@@ -1,77 +1,87 @@
+#!/usr/bin/env python3
+"""Live plot of CSV floats from STM32 over USB CDC.
+
+Line format: 0.154480,0.492643,0.010992
+Usage: python plot_serial.py [port] [baud]
+Deps:  pip install pyserial matplotlib
+"""
+import sys
+import time
+from collections import deque
+
 import serial
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-import numpy as np
-from collections import deque
 
-ser = serial.Serial('/dev/ttyACM0', 115200, timeout=0.1)
-window_size = 100
-data_queue = deque(maxlen=window_size)
+PORT = sys.argv[1] if len(sys.argv) > 1 else "/dev/ttyACM0"
+BAUD = int(sys.argv[2]) if len(sys.argv) > 2 else 115200
+WINDOW = 500                        # samples kept on screen
+LABELS = ["pitch", "roll", "yaw"]   # same order as snprintf in firmware
+DEBUG = True                        # print raw lines seen; set False when working
+N = len(LABELS)
 
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6))
+ser = serial.Serial(PORT, BAUD, timeout=0.01)
+ser.reset_input_buffer()
 
-def update(frame):
-    # Read ONE line if available
+t0 = time.time()
+ts = deque(maxlen=WINDOW)
+data = [deque(maxlen=WINDOW) for _ in range(N)]
+buf = b""
+
+
+def read_lines():
+    """Pull all bytes waiting, yield complete lines."""
+    global buf
+    buf += ser.read_all()
+    buf = buf.replace(b"\r", b"\n")   # handle \r\n, \r, \n
+    while b"\n" in buf:
+        line, buf = buf.split(b"\n", 1)
+        line = line.decode(errors="ignore").strip()
+        if line:
+            if DEBUG:
+                print(repr(line))
+            yield line
+
+
+def parse(line):
+    parts = line.split(",")
+    if len(parts) != N:
+        return None
     try:
-        line = ser.readline().decode(errors="replace").strip()
-        
-        if not line:
-            # No data yet, don't redraw
-            return
-        
-        # Parse line
-        if ',' not in line:
-            print(f"Skipped: no commas in '{line}'")
-            return
-        
-        parts = line.split(',')
-        
-        if len(parts) != 6:
-            print(f"Skipped: expected 6 values, got {len(parts)}  recive string is {line}")
-            return
-        
-        try:
-            vals = list(map(int, parts))
-        except ValueError as e:
-            print(f"Parse error: {e}")
-            return
-        
-        if not all(abs(v) <= 90000 for v in vals):
-            print(f"Skipped: value out of range {vals}")
-            return
-        
-        # Data good, add to queue
-        data_queue.append(vals)
-        print(f"Got: {vals}")
-        
-    except Exception as e:
-        print(f"Error: {e}")
-        return
-    
-    # Only plot if we have data
-    if len(data_queue) < 2:
-        return
-    
-    # Plot
-    data = np.array(list(data_queue))
-    
-    ax1.clear()
-    ax1.plot(data[:, 0:3], linewidth=1)
-    ax1.legend(['ax', 'ay', 'az'], loc='upper right')
-    ax_min, ax_max = data[:, 0:3].min(), data[:, 0:3].max()
-    margin = max(abs(ax_min), abs(ax_max)) * 0.2 + 100
-    ax1.set_ylim(ax_min - margin, ax_max + margin)
-    ax1.set_ylabel('Accel')
-    
-    ax2.clear()
-    ax2.plot(data[:, 3:6], linewidth=1)
-    ax2.legend(['gx', 'gy', 'gz'], loc='upper right')
-    gy_min, gy_max = data[:, 3:6].min(), data[:, 3:6].max()
-    margin = max(abs(gy_min), abs(gy_max)) * 0.2 + 100
-    ax2.set_ylim(gy_min - margin, gy_max + margin)
-    ax2.set_ylabel('Gyro')
+        return [float(p) for p in parts]
+    except ValueError:
+        return None   # half line or garbage, skip
 
-# Fast update rate (50ms) so responsive to incoming data
-ani = FuncAnimation(fig, update, interval=50, cache_frame_data=False)
-plt.tight_layout()
-plt.show()
+
+fig, ax = plt.subplots()
+lines = [ax.plot([], [], label=name)[0] for name in LABELS]
+ax.set_xlabel("time (s)")
+ax.set_ylabel("value")
+ax.grid(True)
+ax.legend(loc="upper left")
+
+
+def update(_):
+    for line in read_lines():
+        vals = parse(line)
+        if vals is None:
+            continue
+        ts.append(time.time() - t0)
+        for i, v in enumerate(vals):
+            data[i].append(v)
+    if ts:
+        for ln, d in zip(lines, data):
+            ln.set_data(ts, d)
+        ax.set_xlim(ts[0], max(ts[-1], ts[0] + 1))
+        lo = min(min(d) for d in data)
+        hi = max(max(d) for d in data)
+        pad = (hi - lo) * 0.1 or 0.1
+        ax.set_ylim(lo - pad, hi + pad)
+    return lines
+
+
+ani = FuncAnimation(fig, update, interval=30, blit=False, cache_frame_data=False)
+try:
+    plt.show()
+finally:
+    ser.close()
