@@ -40,5 +40,10 @@ void PopulateRealValues(struct MPU6050Data *data) {
   data->roll  = atan2f(q0*q1 + q2*q3, 0.5f - q1*q1 - q2*q2);
   data->pitch = asinf(-2.0f * (q1*q3 - q0*q2));
   data->yaw   = atan2f(q1*q2 + q0*q3, 0.5f - q2*q2 - q3*q3);
+
+  data->orientationQuaternion[0] = q0;
+  data->orientationQuaternion[1] = q1;
+  data->orientationQuaternion[2] = q2;
+  data->orientationQuaternion[3] = q3;
 }
 

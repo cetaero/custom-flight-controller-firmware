@@ -510,7 +510,7 @@ HAL_I2C_Mem_Write(&hi2c2,
     //ApplyMadgwickFilter(&data);
     //print(f"{ax},{ay},{az},{gx},{gy},{gz}")
     //snprintf(dataMsg, sizeof(dataMsg), "%d,%d,%d,%d,%d,%d                  \r\n",data.accel_x_raw,data.accel_y_raw,data.accel_z_raw,data.gyro_x_raw, data.gyro_y_raw, data.gyro_z_raw);
-    snprintf(dataMsg, sizeof(dataMsg), "%f,%f,%f            \r\n",data.pitch,data.roll,data.yaw);
+    snprintf(dataMsg, sizeof(dataMsg), "%.5f,%.5f,%.5f,%.5f   \r\n", data.orientationQuaternion[0],data.orientationQuaternion[1],data.orientationQuaternion[2],data.orientationQuaternion[3]);
     LogMessage(dataMsg);
     
     osDelay(100);

@@ -24,4 +24,6 @@ struct MPU6050Data {
     float roll;
     float pitch;
     float yaw;
+
+    float orientationQuaternion[4];
   };
