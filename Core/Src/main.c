@@ -500,18 +500,20 @@ HAL_I2C_Mem_Write(&hi2c2,
 
   char dataMsg[100];
   struct MPU6050Data data;
+  int counter=0;
   //HAL_StatusTypeDef dataReadStatus;
   /* Infinite loop */
   for(;;)
   {
     //reading accel data
     read_register_burst_16(SENSOR_ADDRESS, 0x03, 6, data.accel_gyro_sample_16,2);
-    PopulateRealValues(&data);
+    PopulateRealValues(&data,counter);
     //ApplyMadgwickFilter(&data);
     //print(f"{ax},{ay},{az},{gx},{gy},{gz}")
     //snprintf(dataMsg, sizeof(dataMsg), "%d,%d,%d,%d,%d,%d                  \r\n",data.accel_x_raw,data.accel_y_raw,data.accel_z_raw,data.gyro_x_raw, data.gyro_y_raw, data.gyro_z_raw);
     snprintf(dataMsg, sizeof(dataMsg), "%.5f,%.5f,%.5f,%.5f   \r\n", data.orientationQuaternion[0],data.orientationQuaternion[1],data.orientationQuaternion[2],data.orientationQuaternion[3]);
     LogMessage(dataMsg);
+    counter++;
     
     osDelay(100);
   }

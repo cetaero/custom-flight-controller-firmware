@@ -207,6 +207,16 @@ void MadgwickAHRSupdateIMU(float gx, float gy, float gz, float ax, float ay, flo
 	q2 *= recipNorm;
 	q3 *= recipNorm;
 }
+void Madgwick_InitFromAccel(float ax, float ay, float az) {
+    float roll  = atan2f(ay, az);
+    float pitch = atan2f(-ax, sqrtf(ay*ay + az*az));
+    float cr = cosf(roll*0.5f),  sr = sinf(roll*0.5f);
+    float cp = cosf(pitch*0.5f), sp = sinf(pitch*0.5f);
+    q0 = cr*cp;
+    q1 = sr*cp;
+    q2 = cr*sp;
+    q3 = -sr*sp;      // yaw = 0
+}
 
 //---------------------------------------------------------------------------------------------------
 // Fast inverse square-root

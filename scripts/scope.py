@@ -21,7 +21,7 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 DEMO = "--demo" in sys.argv
 args = [a for a in sys.argv[1:] if not a.startswith("--")]
-PORT = args[0] if len(args) > 0 else "/dev/ttyACM1"
+PORT = args[0] if len(args) > 0 else "/dev/ttyACM0"
 BAUD = int(args[1]) if len(args) > 1 else 115200
 
 EULER_ORDER = ("pitch", "roll", "yaw")   # order of the 3 values in firmware print

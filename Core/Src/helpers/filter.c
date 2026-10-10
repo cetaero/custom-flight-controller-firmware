@@ -15,7 +15,7 @@
 uint32_t lastTick;
 float deltaT;
 
-void PopulateRealValues(struct MPU6050Data *data) {
+void PopulateRealValues(struct MPU6050Data *data,int count) {
   data->accel_x_raw=data->accel_gyro_sample_16[0];
   data->accel_y_raw=data->accel_gyro_sample_16[1];
   data->accel_z_raw=data->accel_gyro_sample_16[2];
@@ -32,6 +32,9 @@ void PopulateRealValues(struct MPU6050Data *data) {
   data->gyro_x  = (int16_t)data->gyro_x_raw * kg;    // dps
   data->gyro_y  = (int16_t)data->gyro_y_raw * kg;
   data->gyro_z  = (int16_t)data->gyro_z_raw * kg;
+  if(count==100){
+    Madgwick_InitFromAccel(data->accel_x,data->accel_y,data->accel_z);
+  }
   MadgwickAHRSupdateIMU(   
     data->gyro_x,data->gyro_y,data->gyro_z,
     data->accel_x,data->accel_y,data->accel_z 
